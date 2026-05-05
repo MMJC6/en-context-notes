@@ -5,23 +5,33 @@ chrome.runtime.onInstalled.addListener((details) => {
   }
 });
 
-// ===== Keep service worker alive (MV3 terminates idle workers after ~30s) =====
-chrome.alarms.create('heartbeat', { periodInMinutes: 1 / 60 }); // every 1 second
-chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === 'heartbeat') { /* no-op, just keeps worker alive */ }
-});
+// ===== Prevent idle termination (MV3 edge case: some Chrome versions terminate
+//       workers even with pending message ports; 15s heartbeat covers this) =====
+chrome.alarms.create('heartbeat', { periodInMinutes: 0.25 });
+chrome.alarms.onAlarm.addListener(() => {});
 
 // ===== Translation cache =====
+// Uses storage.session: survives worker restart, not persisted across browser restart.
+// This is the right trade-off — browser restart = fresh session, cache can rebuild.
 const translationCache = {};
 
-async function loadCache() {
-  const data = await chrome.storage.local.get('transCache');
+let cacheLoaded = false;
+async function ensureCacheLoaded() {
+  if (cacheLoaded) return;
+  const data = await chrome.storage.session.get('transCache');
   if (data.transCache) Object.assign(translationCache, data.transCache);
+  cacheLoaded = true;
 }
-loadCache();
 
 async function saveCache() {
-  await chrome.storage.local.set({ transCache: translationCache });
+  // Keep only last 500 entries to bound storage usage
+  const keys = Object.keys(translationCache);
+  if (keys.length > 500) {
+    for (const k of keys.slice(0, keys.length - 500)) {
+      delete translationCache[k];
+    }
+  }
+  await chrome.storage.session.set({ transCache: translationCache });
 }
 
 function hashKey(text) {
@@ -281,7 +291,8 @@ async function handleMessage(request, sender) {
         return { error: '请先在设置页面配置 API Key' };
       }
 
-      // Check cache
+      // Check cache (lazy load on first call after worker restart)
+      await ensureCacheLoaded();
       const key = hashKey(word + '|||' + sentence);
       if (translationCache[key]) {
         return translationCache[key];
