@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>设置 - 英文语境笔记</title>
+<link rel="stylesheet" href="options.css">
+</head>
+<body>
+<div class="options-container">
+  <h1>API 设置</h1>
+
+  <div class="form-group">
+    <label for="apiKey">API Key</label>
+    <input type="password" id="apiKey" placeholder="sk-..." autocomplete="off">
+    <span class="hint">支持 DeepSeek / OpenAI 及兼容接口</span>
+  </div>
+
+  <div class="form-group">
+    <label for="apiBase">API Base URL</label>
+    <input type="text" id="apiBase" placeholder="https://api.deepseek.com/v1">
+    <span class="hint">DeepSeek: https://api.deepseek.com/v1</span>
+  </div>
+
+  <div class="form-group">
+    <label for="apiModel">模型名称</label>
+    <input type="text" id="apiModel" placeholder="deepseek-chat">
+    <span class="hint">DeepSeek: deepseek-chat，OpenAI: gpt-4o</span>
+  </div>
+
+  <div class="form-actions">
+    <button id="saveBtn">保存设置</button>
+    <span id="status" class="status"></span>
+  </div>
+</div>
+<script src="options.js"></script>
+</body>
+</html>

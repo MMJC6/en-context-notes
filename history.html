@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>我的语料库 - 英文语境笔记</title>
+<link rel="stylesheet" href="history.css">
+</head>
+<body>
+<div class="history-app">
+  <header class="history-header">
+    <h1>我的语料库</h1>
+    <div class="header-actions">
+      <input type="text" id="searchInput" class="search-input" placeholder="搜索单词或句子...">
+      <button id="exportBtn" class="action-btn">导出 JSON</button>
+    </div>
+  </header>
+
+  <div class="tab-nav">
+    <button class="tab-btn active" data-tab="records">记录</button>
+    <button class="tab-btn" data-tab="growth">成长</button>
+  </div>
+
+  <div id="tabRecords" class="tab-content active">
+    <div class="stats-bar">
+      <span id="totalWords">0 个单词</span>
+      <span id="totalEncounters">0 次遇见</span>
+      <span id="totalArticles">0 篇文章</span>
+    </div>
+    <div id="recordList" class="record-list">
+      <div class="empty-state">暂无记录，去网页上划词翻译吧</div>
+    </div>
+  </div>
+
+  <div id="tabGrowth" class="tab-content">
+  </div>
+</div>
+<script src="history.js"></script>
+</body>
+</html>
