@@ -3,7 +3,7 @@
   "name": "英文语境笔记",
   "version": "1.0",
   "description": "划词翻译，自动存句。你的私人语境语料库。",
-  "permissions": ["storage", "activeTab", "tts"],
+  "permissions": ["storage", "activeTab", "tts", "alarms"],
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "background.js",

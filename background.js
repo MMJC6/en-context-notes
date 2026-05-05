@@ -5,6 +5,12 @@ chrome.runtime.onInstalled.addListener((details) => {
   }
 });
 
+// ===== Keep service worker alive (MV3 terminates idle workers after ~30s) =====
+chrome.alarms.create('heartbeat', { periodInMinutes: 1 / 60 }); // every 1 second
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === 'heartbeat') { /* no-op, just keeps worker alive */ }
+});
+
 // ===== Translation cache =====
 const translationCache = {};
 

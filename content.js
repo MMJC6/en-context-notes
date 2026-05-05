@@ -265,11 +265,17 @@ async function translateAndUpdate(word, sentence, title, url) {
     // Step 2: Translate
     const result = await chrome.runtime.sendMessage({ action: 'translate', word, sentence });
 
+    if (!result) {
+      showError('翻译服务无响应，请刷新页面后重试');
+      return;
+    }
+
     if (result.error) {
-      if (result.error.includes('API Key')) {
+      console.error('[content] translate error:', result.error);
+      if (typeof result.error === 'string' && result.error.includes('API Key')) {
         showOnboarding();
       } else {
-        showError(result.error);
+        showError(typeof result.error === 'string' ? result.error : '翻译失败');
       }
       return;
     }
