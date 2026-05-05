@@ -19,14 +19,14 @@ document.addEventListener('mousedown', onMouseDown, { passive: true });
 // ===== Mouse handlers =====
 function onMouseDown(e) {
   // Don't hide if clicking inside our popup
-  if (e.target.closest('.en-trans-popup')) return;
+  if (popup && popup.contains(e.target)) return;
   clearTimeout(debounceTimer);
   scheduleHide(600);
 }
 
 function onMouseUp(e) {
   // Skip if clicking inside our popup
-  if (e.target.closest('.en-trans-popup')) return;
+  if (popup && popup.contains(e.target)) return;
 
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => handleSelection(e), 250);
