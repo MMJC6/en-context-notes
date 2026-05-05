@@ -373,6 +373,29 @@ async function handleMessage(request, sender) {
       return { success: true };
     }
 
+    case 'speak': {
+      const { text } = request;
+      const hasChinese = /[一-鿿]/.test(text);
+      const lang = hasChinese ? 'zh-CN' : 'en-US';
+      const voices = await new Promise(resolve => chrome.tts.getVoices(resolve));
+      let voiceName;
+      if (hasChinese) {
+        const zh = voices.find(v => v.lang && v.lang.startsWith('zh'));
+        if (zh) voiceName = zh.voiceName;
+      } else {
+        for (const name of ['Samantha', 'Alex', 'Google US English', 'Microsoft Zira']) {
+          const found = voices.find(v => v.voiceName && v.voiceName.includes(name));
+          if (found) { voiceName = found.voiceName; break; }
+        }
+        if (!voiceName) {
+          const en = voices.find(v => v.lang && v.lang.startsWith('en'));
+          if (en) voiceName = en.voiceName;
+        }
+      }
+      chrome.tts.speak(text, { voiceName, lang, rate: 1.0, pitch: 1.0, volume: 1.0 });
+      return { success: true };
+    }
+
     case 'getSettings': {
       return await getSettings();
     }

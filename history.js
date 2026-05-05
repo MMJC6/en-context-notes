@@ -329,31 +329,9 @@ function renderActivityCalendar(dailyActivity) {
   }).join('');
 }
 
-// ===== TTS (chrome.tts — native macOS voice quality) =====
-async function speak(text) {
-  chrome.tts.stop();
-  const hasChinese = /[一-鿿]/.test(text);
-  const lang = hasChinese ? 'zh-CN' : 'en-US';
-
-  const voices = await new Promise(resolve => chrome.tts.getVoices(resolve));
-  let voiceName;
-
-  if (hasChinese) {
-    const zh = voices.find(v => v.lang && v.lang.startsWith('zh'));
-    if (zh) voiceName = zh.voiceName;
-  } else {
-    const premium = ['Samantha', 'Alex', 'Google US English', 'Microsoft Zira'];
-    for (const name of premium) {
-      const found = voices.find(v => v.voiceName && v.voiceName.includes(name));
-      if (found) { voiceName = found.voiceName; break; }
-    }
-    if (!voiceName) {
-      const en = voices.find(v => v.lang && v.lang.startsWith('en'));
-      if (en) voiceName = en.voiceName;
-    }
-  }
-
-  chrome.tts.speak(text, { voiceName, lang, rate: 1.0, pitch: 1.0, volume: 1.0 });
+// ===== TTS =====
+function speak(text) {
+  chrome.runtime.sendMessage({ action: 'speak', text });
 }
 
 // ===== Export =====

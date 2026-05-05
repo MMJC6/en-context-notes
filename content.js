@@ -368,60 +368,33 @@ function showError(msg) {
   wordBox.querySelector('.en-trans-word-result').style.color = '#f38ba8';
 }
 
-// ===== TTS (chrome.tts — native macOS voice quality) =====
-async function toggleSpeak() {
+// ===== TTS =====
+function toggleSpeak() {
   const sentence = popup.querySelector('.en-trans-original').textContent;
   if (!sentence) return;
 
   const btn = popup.querySelector('.en-trans-btn.speak');
 
   if (isSpeaking) {
-    chrome.tts.stop();
+    chrome.runtime.sendMessage({ action: 'speak', text: '' }); // empty = stop
     isSpeaking = false;
     btn.classList.remove('playing');
     btn.textContent = '▶';
     return;
   }
 
-  const hasChinese = /[一-鿿]/.test(sentence);
-  const lang = hasChinese ? 'zh-CN' : 'en-US';
+  isSpeaking = true;
+  btn.classList.add('playing');
+  btn.textContent = '⏹';
 
-  // Get available voices and pick the best one
-  const voices = await new Promise(resolve => chrome.tts.getVoices(resolve));
-  let voiceName;
-
-  if (hasChinese) {
-    const zh = voices.find(v => v.lang && v.lang.startsWith('zh'));
-    if (zh) voiceName = zh.voiceName;
-  } else {
-    const premium = ['Samantha', 'Alex', 'Google US English', 'Microsoft Zira'];
-    for (const name of premium) {
-      const found = voices.find(v => v.voiceName && v.voiceName.includes(name));
-      if (found) { voiceName = found.voiceName; break; }
-    }
-    if (!voiceName) {
-      const en = voices.find(v => v.lang && v.lang.startsWith('en'));
-      if (en) voiceName = en.voiceName;
-    }
-  }
-
-  chrome.tts.speak(sentence, {
-    voiceName,
-    lang,
-    rate: 1.0,
-    pitch: 1.0,
-    volume: 1.0,
-    onEvent: (event) => {
-      if (event.type === 'start') {
-        isSpeaking = true;
-        btn.classList.add('playing');
-        btn.textContent = '⏹';
-      } else if (event.type === 'end' || event.type === 'interrupted' || event.type === 'error') {
-        isSpeaking = false;
-        btn.classList.remove('playing');
-        btn.textContent = '▶';
-      }
-    }
+  chrome.runtime.sendMessage({ action: 'speak', text: sentence }).then(() => {
+    isSpeaking = false;
+    btn.classList.remove('playing');
+    btn.textContent = '▶';
+  }).catch(() => {
+    isSpeaking = false;
+    btn.classList.remove('playing');
+    btn.textContent = '▶';
   });
 }
 
