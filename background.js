@@ -186,6 +186,35 @@ async function saveRecord(record) {
   });
 }
 
+function isSameEncounterContext(context, { url, sentence }) {
+  if (!context) return false;
+  return (context.url || '') === (url || '') && (context.sentence || '') === (sentence || '');
+}
+
+function normalizeEncounterRecord(record) {
+  const originalEncounterCount = record.encounterCount || 1;
+  const baseContexts = record.contexts && record.contexts.length > 0
+    ? record.contexts
+    : [{ url: record.url, title: record.title, sentence: record.sentence, timestamp: record.timestamp }];
+  const dedupedContexts = [];
+  const seen = new Set();
+
+  for (const context of baseContexts) {
+    const key = `${context.url || ''}|||${context.sentence || ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    dedupedContexts.push(context);
+  }
+
+  record.contexts = dedupedContexts;
+  record.encounterCount = Math.max(dedupedContexts.length, 1);
+
+  return {
+    record,
+    changed: dedupedContexts.length !== baseContexts.length || originalEncounterCount !== Math.max(dedupedContexts.length, 1)
+  };
+}
+
 async function getRecordsByUrl() {
   const db = await openDB();
   return new Promise((resolve, reject) => {
@@ -428,11 +457,28 @@ async function handleMessage(request, sender) {
 
       if (existing) {
         console.log('[saveRecord] UPSERT — found existing, encounterCount before:', existing.encounterCount);
+        const normalized = normalizeEncounterRecord(existing);
+        const contexts = normalized.record.contexts;
+        const latestContext = contexts[contexts.length - 1];
+
+        // Duplicate content-script deliveries can arrive for the same selection.
+        // Treat the same sentence on the same page as one encounter only.
+        if (isSameEncounterContext(latestContext, { url, sentence })) {
+          console.log('[saveRecord] DUPLICATE delivery suppressed for:', JSON.stringify(word));
+          if (normalized.changed) {
+            await saveRecord(existing);
+          }
+          return {
+            success: true,
+            id: existing.id,
+            isRepeat: (existing.encounterCount || 1) > 1,
+            encounterCount: existing.encounterCount || 1
+          };
+        }
+
         const newContext = { url, title, sentence, timestamp: Date.now() };
         existing.encounterCount = (existing.encounterCount || 0) + 1;
-        if (!existing.contexts || existing.contexts.length === 0) {
-          existing.contexts = [{ url: existing.url, title: existing.title, sentence: existing.sentence, timestamp: existing.timestamp }];
-        }
+        existing.contexts = contexts;
         existing.contexts.push(newContext);
         await saveRecord(existing);
         console.log('[saveRecord] UPSERT done — encounterCount after:', existing.encounterCount);
