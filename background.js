@@ -233,7 +233,7 @@ async function deleteRecord(id) {
 
 // ===== AI Translation =====
 async function callAI(apiBase, apiKey, apiModel, word, sentence) {
-  const prompt = `Translate word "${word}" in sentence context, then translate the whole sentence to Chinese.\nReturn JSON: {"wordTranslation":"...","sentenceTranslation":"..."}\n\nSentence: ${sentence}`;
+  const prompt = `Translate word "${word}" in sentence context, then translate the whole sentence to Chinese.\nReturn only valid JSON with exactly these keys: {"wordTranslation":"...","sentenceTranslation":"..."}\nDo not add markdown fences or extra explanation.\n\nSentence: ${sentence}`;
 
   const resp = await fetch(`${apiBase}/chat/completions`, {
     method: 'POST',
@@ -255,24 +255,138 @@ async function callAI(apiBase, apiKey, apiModel, word, sentence) {
   }
 
   const data = await resp.json();
-  const content = data.choices?.[0]?.message?.content || '';
+  const content = getMessageText(data.choices?.[0]?.message?.content);
   return parseTranslation(content);
 }
 
-function parseTranslation(content) {
-  // Try direct JSON parse
-  try {
-    const cleaned = content.replace(/```json\s*|```\s*/g, '').trim();
-    return JSON.parse(cleaned);
-  } catch (e) {
-    // Fallback: try to extract with regex
-    const wtMatch = content.match(/"wordTranslation"\s*:\s*"([^"]+)"/);
-    const stMatch = content.match(/"sentenceTranslation"\s*:\s*"([^"]+)"/);
-    if (wtMatch && stMatch) {
-      return { wordTranslation: wtMatch[1], sentenceTranslation: stMatch[1] };
-    }
-    throw new Error('Failed to parse translation response');
+function getMessageText(content) {
+  if (typeof content === 'string') {
+    return content;
   }
+
+  if (Array.isArray(content)) {
+    return content.map(part => {
+      if (typeof part === 'string') {
+        return part;
+      }
+      if (part && typeof part.text === 'string') {
+        return part.text;
+      }
+      return '';
+    }).join('\n').trim();
+  }
+
+  return '';
+}
+
+function stripCodeFence(text) {
+  return text.replace(/```json\s*|```\s*/gi, '').trim();
+}
+
+function extractJsonObject(text) {
+  const start = text.indexOf('{');
+  if (start === -1) return '';
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (ch === '\\') {
+        escaped = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+
+    if (ch === '{') {
+      depth++;
+      continue;
+    }
+
+    if (ch === '}') {
+      depth--;
+      if (depth === 0) {
+        return text.slice(start, i + 1);
+      }
+    }
+  }
+
+  return '';
+}
+
+function pickTranslationFields(parsed) {
+  if (!parsed || typeof parsed !== 'object') return null;
+
+  const wordTranslation =
+    parsed.wordTranslation ||
+    parsed.word_translation ||
+    parsed.wordMeaning ||
+    parsed.word_meaning;
+  const sentenceTranslation =
+    parsed.sentenceTranslation ||
+    parsed.sentence_translation ||
+    parsed.sentenceMeaning ||
+    parsed.sentence_meaning;
+
+  if (
+    typeof wordTranslation === 'string' &&
+    wordTranslation.trim() &&
+    typeof sentenceTranslation === 'string' &&
+    sentenceTranslation.trim()
+  ) {
+    return {
+      wordTranslation: wordTranslation.trim(),
+      sentenceTranslation: sentenceTranslation.trim()
+    };
+  }
+
+  return null;
+}
+
+function summarizeContent(text) {
+  return text.replace(/\s+/g, ' ').trim().slice(0, 200);
+}
+
+function parseTranslation(content) {
+  const raw = typeof content === 'string' ? content : '';
+  const candidates = [
+    stripCodeFence(raw),
+    extractJsonObject(raw)
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate);
+      const picked = pickTranslationFields(parsed);
+      if (picked) {
+        return picked;
+      }
+    } catch (e) {
+      // Keep trying the next candidate.
+    }
+  }
+
+  // Fallback: try to extract with regex from semi-structured text
+  const wtMatch = raw.match(/"(wordTranslation|word_translation|wordMeaning|word_meaning)"\s*:\s*"([^"]+)"/);
+  const stMatch = raw.match(/"(sentenceTranslation|sentence_translation|sentenceMeaning|sentence_meaning)"\s*:\s*"([^"]+)"/);
+  if (wtMatch && stMatch) {
+    return { wordTranslation: wtMatch[2], sentenceTranslation: stMatch[2] };
+  }
+
+  const summary = summarizeContent(raw);
+  throw new Error(`Failed to parse translation response${summary ? `: ${summary}` : ''}`);
 }
 
 // ===== Message handling =====
