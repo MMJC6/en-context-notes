@@ -261,8 +261,25 @@ async function deleteRecord(id) {
 }
 
 // ===== AI Translation =====
+function isDeepSeekApi(apiBase, apiModel) {
+  return /deepseek/i.test(apiBase || '') || /^deepseek-/i.test(apiModel || '');
+}
+
 async function callAI(apiBase, apiKey, apiModel, word, sentence) {
   const prompt = `Translate word "${word}" in sentence context, then translate the whole sentence to Chinese.\nReturn only valid JSON with exactly these keys: {"wordTranslation":"...","sentenceTranslation":"..."}\nDo not add markdown fences or extra explanation.\n\nSentence: ${sentence}`;
+  const body = {
+    model: apiModel,
+    messages: [{ role: 'user', content: prompt }],
+    temperature: 0,
+    max_tokens: 400
+  };
+
+  if (isDeepSeekApi(apiBase, apiModel)) {
+    // DeepSeek V4 models can spend the whole budget in reasoning_content and leave
+    // message.content empty unless thinking is explicitly disabled.
+    body.thinking = { type: 'disabled' };
+    body.response_format = { type: 'json_object' };
+  }
 
   const resp = await fetch(`${apiBase}/chat/completions`, {
     method: 'POST',
@@ -270,12 +287,7 @@ async function callAI(apiBase, apiKey, apiModel, word, sentence) {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({
-      model: apiModel,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0,
-      max_tokens: 400
-    })
+    body: JSON.stringify(body)
   });
 
   if (!resp.ok) {
@@ -284,6 +296,12 @@ async function callAI(apiBase, apiKey, apiModel, word, sentence) {
   }
 
   const data = await resp.json();
+  if (!data.choices?.[0]?.message?.content && data.choices?.[0]?.message?.reasoning_content) {
+    console.warn('[translate] empty content with reasoning_content present', {
+      model: apiModel,
+      finishReason: data.choices?.[0]?.finish_reason
+    });
+  }
   const content = getMessageText(data.choices?.[0]?.message?.content);
   return parseTranslation(content);
 }
