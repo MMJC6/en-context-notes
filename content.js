@@ -4,6 +4,7 @@ let hideTimer = null;
 let debounceTimer = null;
 let isSpeaking = false;
 let currentRecordId = null;
+const EXTENSION_RELOAD_MSG = '扩展刚刚更新，当前页面仍在使用旧脚本。请刷新页面后重试。';
 
 // ===== Chinese page detection =====
 function isChinesePage() {
@@ -257,13 +258,37 @@ function scheduleHide(ms) {
   }, ms);
 }
 
+function canUseRuntime() {
+  return !!(globalThis.chrome && chrome.runtime && typeof chrome.runtime.sendMessage === 'function');
+}
+
+async function sendRuntimeMessage(message) {
+  if (!canUseRuntime()) {
+    throw new Error(EXTENSION_RELOAD_MSG);
+  }
+
+  try {
+    return await chrome.runtime.sendMessage(message);
+  } catch (error) {
+    const messageText = error && error.message ? error.message : String(error || '');
+    if (
+      messageText.includes('Extension context invalidated') ||
+      messageText.includes('Receiving end does not exist') ||
+      messageText.includes('Cannot read properties of undefined')
+    ) {
+      throw new Error(EXTENSION_RELOAD_MSG);
+    }
+    throw error;
+  }
+}
+
 async function translateAndUpdate(word, sentence, title, url) {
   try {
     // Step 1: Check if word was seen before (runs in parallel with translate)
-    const checkPromise = chrome.runtime.sendMessage({ action: 'checkWord', word });
+    const checkPromise = sendRuntimeMessage({ action: 'checkWord', word });
 
     // Step 2: Translate
-    const result = await chrome.runtime.sendMessage({ action: 'translate', word, sentence });
+    const result = await sendRuntimeMessage({ action: 'translate', word, sentence });
 
     if (!result) {
       showError('翻译服务无响应，请刷新页面后重试');
@@ -294,7 +319,7 @@ async function translateAndUpdate(word, sentence, title, url) {
     // Step 3: Wait for word check, then save (upsert)
     const checkResult = await checkPromise;
 
-    const saveResult = await chrome.runtime.sendMessage({
+    const saveResult = await sendRuntimeMessage({
       action: 'saveRecord',
       record: {
         word,
@@ -356,7 +381,7 @@ function showOnboarding() {
     '</div>';
 
   document.getElementById('en-onboarding-btn').addEventListener('click', () => {
-    chrome.runtime.sendMessage({ action: 'openOptions' });
+    sendRuntimeMessage({ action: 'openOptions' }).catch((e) => showError(e.message || EXTENSION_RELOAD_MSG));
   });
 }
 
@@ -376,7 +401,7 @@ function toggleSpeak() {
   const btn = popup.querySelector('.en-trans-btn.speak');
 
   if (isSpeaking) {
-    chrome.runtime.sendMessage({ action: 'speak', text: '' }); // empty = stop
+    sendRuntimeMessage({ action: 'speak', text: '' }).catch(() => {}); // empty = stop
     isSpeaking = false;
     btn.classList.remove('playing');
     btn.textContent = '▶';
@@ -387,7 +412,7 @@ function toggleSpeak() {
   btn.classList.add('playing');
   btn.textContent = '⏹';
 
-  chrome.runtime.sendMessage({ action: 'speak', text: sentence }).then(() => {
+  sendRuntimeMessage({ action: 'speak', text: sentence }).then(() => {
     isSpeaking = false;
     btn.classList.remove('playing');
     btn.textContent = '▶';
@@ -408,4 +433,3 @@ function escapeHtml(str) {
 function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
-
