@@ -82,6 +82,22 @@ h1 {
   background: #74c7ec;
 }
 
+#resetBtn {
+  background: transparent;
+  color: #a6adc8;
+  border: 1px solid #45475a;
+  padding: 9px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+#resetBtn:hover {
+  border-color: #f38ba8;
+  color: #f38ba8;
+}
+
 .status {
   font-size: 13px;
 }

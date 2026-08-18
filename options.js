@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', loadSettings);
 
 document.getElementById('saveBtn').addEventListener('click', saveSettings);
+document.getElementById('resetBtn').addEventListener('click', resetSettings);
 
 async function loadSettings() {
   try {
@@ -12,6 +13,19 @@ async function loadSettings() {
     }
   } catch (e) {
     // Settings not loaded, use defaults
+  }
+}
+
+async function resetSettings() {
+  // Drop values saved from the options page so env.js / built-in defaults take over.
+  // Needed after re-installing from the same folder path: the extension ID (and thus
+  // chrome.storage) survives, and stale saved values would keep shadowing env.js.
+  try {
+    await chrome.storage.local.remove(['apiKey', 'apiBase', 'apiModel']);
+    showStatus('✓ 已清除，改用 env.js / 默认值', 'success');
+    await loadSettings();
+  } catch (e) {
+    showStatus('清除失败: ' + e.message, 'error');
   }
 }
 
