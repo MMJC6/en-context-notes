@@ -44,15 +44,22 @@
    ```bash
    git clone https://github.com/MMJC6/en-context-notes.git
    ```
-2. 打开 `chrome://extensions/`，开启右上角「开发者模式」
-3. 点击「加载已解压的扩展程序」，选择项目目录
-4. 右键扩展图标 → 选项，填入 API Key
+2. 复制配置模板为 `env.js`，填入你的 API Key（该文件已被 .gitignore 排除，不会进 git）
+   ```bash
+   cp env.example.js env.js
+   ```
+3. 打开 `chrome://extensions/`，开启右上角「开发者模式」
+4. 点击「加载已解压的扩展程序」，选择项目目录
+
+> 没有创建 env.js 也能用：加载后右键扩展图标 → 选项，手动填入 API Key。
 
 ---
 
 ## 配置
 
 支持所有 OpenAI 兼容接口。推荐 [DeepSeek](https://platform.deepseek.com/)（新用户送 500 万 token，几乎免费）。
+
+配置来源优先级：**设置页 > env.js > 内置默认值**。`env.js` 从 `env.example.js` 复制而来，只在本地生效，适合预置私有网关地址或 Key，不会被提交到 git。
 
 | 设置项 | 默认值 |
 |--------|--------|
@@ -73,6 +80,7 @@ content.js        # 划词监听 · 取整句 · 弹窗 UI · TTS
 history.html/js   # 全屏语料库 + 成长概览
 popup.html/js     # 工具栏弹窗
 options.html/js   # API 设置页
+env.example.js    # env.js 模板（env.js 为本机私有配置，gitignored）
 ```
 
 ---

@@ -45,12 +45,31 @@ function hashKey(text) {
 }
 
 // ===== Settings =====
+// Priority: options page (chrome.storage) > env.js (gitignored local file) > generic defaults.
+// env.js is loaded via dynamic import so the extension still boots when it's absent
+// (fresh clone); users then configure via the options page or create env.js from
+// env.example.js.
+let envCache;
+async function loadEnv() {
+  if (envCache !== undefined) return envCache;
+  try {
+    const m = await import(chrome.runtime.getURL('env.js'));
+    envCache = m.ENV || {};
+  } catch (e) {
+    envCache = {};
+  }
+  return envCache;
+}
+
 async function getSettings() {
-  const data = await chrome.storage.local.get(['apiKey', 'apiBase', 'apiModel']);
+  const [data, env] = await Promise.all([
+    chrome.storage.local.get(['apiKey', 'apiBase', 'apiModel']),
+    loadEnv()
+  ]);
   return {
-    apiKey: data.apiKey || '',
-    apiBase: data.apiBase || 'https://api.deepseek.com/v1',
-    apiModel: data.apiModel || 'deepseek-chat'
+    apiKey: data.apiKey || env.apiKey || '',
+    apiBase: data.apiBase || env.apiBase || 'https://api.deepseek.com/v1',
+    apiModel: data.apiModel || env.apiModel || 'deepseek-chat'
   };
 }
 

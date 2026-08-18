@@ -19,13 +19,17 @@
   <div class="form-group">
     <label for="apiBase">API Base URL</label>
     <input type="text" id="apiBase" placeholder="https://api.deepseek.com/v1">
-    <span class="hint">DeepSeek: https://api.deepseek.com/v1</span>
+    <span class="hint">DeepSeek: https://api.deepseek.com/v1，也支持任意 OpenAI 兼容接口</span>
   </div>
 
   <div class="form-group">
     <label for="apiModel">模型名称</label>
     <input type="text" id="apiModel" placeholder="deepseek-chat">
     <span class="hint">DeepSeek: deepseek-chat，OpenAI: gpt-4o</span>
+  </div>
+
+  <div class="form-group">
+    <span class="hint">提示：项目根目录的 env.js（从 env.example.js 复制）可预置以上全部配置，该文件不会上传 git</span>
   </div>
 
   <div class="form-actions">
