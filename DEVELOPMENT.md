@@ -18,7 +18,7 @@
 | 存储 | IndexedDB | 语料库持久化 |
 | 缓存 | chrome.storage.session | 翻译缓存，Service Worker 重启后存活 |
 | 设置 | chrome.storage.local | API Key / Base URL / Model |
-| 语音 | chrome.tts | 系统原生 TTS（macOS Samantha） |
+| 语音 | Edge 在线神经语音 | 免费 keyless（en-US-AriaNeural 美音女声）；offscreen 文档播放；断网回退 chrome.tts |
 | AI | OpenAI 兼容 API | DeepSeek / OpenAI / 自定义 |
 | 保活 | chrome.alarms | 15 秒心跳防 Worker 休眠 |
 
@@ -29,7 +29,9 @@
 ```
 en-context-notes/
 ├── manifest.json         # 扩展清单（权限、入口、图标）
-├── background.js         # Service Worker — API 调用、IndexedDB、TTS、消息路由
+├── background.js         # Service Worker — API 调用、IndexedDB、TTS 路由、消息路由
+├── offscreen.html/js     # offscreen 文档 — Edge 神经语音取音频 + Audio 播放
+├── rules.json            # declarativeNetRequest 规则 — 给 TTS WebSocket 请求加 Edge UA
 ├── content.js            # 内容脚本 — 划词监听、取整句、浮窗 UI
 ├── content.css           # 浮窗样式
 ├── popup.html/js/css     # 工具栏弹窗 — 最近单词列表
@@ -87,9 +89,33 @@ content.js: → background.js: 'saveRecord'
 | `getRecordsByUrl` | popup → bg | — | `{ groups: [...] }` |
 | `deleteRecord` | * → bg | `{ id }` | `{ success }` |
 | `deduplicate` | history → bg | — | `{ success, merged }` |
-| `speak` | * → bg | `{ text }` | `{ success }` |
+| `speak` | * → bg | `{ text }`（空文本=停止） | `{ success }`（神经语音路径在播放结束后才响应，朗读中按钮显示 ⏹） |
 | `getSettings` | options → bg | — | `{ apiKey, apiBase, apiModel }` |
 | `openOptions` | content → bg | — | 打开设置页 |
+| bg → offscreen | 内部 | `{ target:'offscreen', cmd:'speak'/'stop', text }` | 播放结束/被中断时响应 `{success, voice, bytes}` |
+
+### TTS 语音链路（v1.1）
+
+朗读按钮 → background `speak` 路由 → 确保 offscreen 文档存在（`chrome.offscreen`，
+reason `AUDIO_PLAYBACK`）→ offscreen.js 直连 `wss://speech.platform.bing.com/.../edge/v1`
+（微软 Edge 浏览器自己的免费朗读服务，无需 key）：
+
+1. 计算 DRM 令牌 `Sec-MS-GEC` = SHA256(`<windows纪元ticks(取整5分钟)>` + `<token>`) 大写 hex —— **ticks 在前**
+2. 发送 `speech.config`（输出 `audio-24khz-48kbitrate-mono-mp3`）和 SSML（voice 按语言选择：
+   英文 `en-US-AriaNeural` 美音女声 / 中文 `zh-CN-XiaoxiaoNeural`）
+3. 收集二进制帧（2 字节大头 header 长度 + 头 + mp3 数据）直到 `Path:turn.end`
+4. Blob → `URL.createObjectURL` → `Audio.play()`，播完才响应消息
+
+两个关键坑（都实测踩过）：
+
+- **服务端校验 User-Agent 必须含 `Edg/`**，普通 Chrome UA 直接 403；浏览器 WebSocket
+  无法自设 UA，所以 `rules.json` 用 declarativeNetRequest 给
+  `speech.platform.bing.com` 的 websocket 请求强制注入 Edge UA
+- MV3 Service Worker 没有 `Audio`/`createObjectURL`，必须由 offscreen 文档播放；
+  offscreen 文档里 `chrome.storage.session` 不可用（调试记录写入会静默失败，属预期）
+
+任何一步失败（断网、端点变更）→ background 自动回退 `chrome.tts` 系统语音，
+并在 `chrome.storage.session.ttsFallback` 留下原因便于排查。
 
 ### IndexedDB 数据模型
 
@@ -202,7 +228,7 @@ content.js: → background.js: 'saveRecord'
 1. **`host_permissions: ["<all_urls>"]`** — Chrome Web Store 审核会较慢，需逐权限解释用途
 2. **取整句算法** — 依赖 DOM TreeWalker，在复杂页面（如 Twitter 时间线、代码编辑器）可能取不到理想范围
 3. **高频词去重** — 使用全扫描 + 大小写不敏感比较，记录数 < 10k 时性能无问题，超出后建议加 `wordLower` 索引
-4. **TTS** — 依赖操作系统 TTS 引擎。Windows 上中文语音质量可能不如 macOS。可通过 `chrome.tts.getVoices()` 查看可用语音
+4. **TTS** — 走微软 Edge 免费在线朗读服务（keyless）。属逆向的非官方端点，微软改协议时会失效；失效后自动回退 chrome.tts 系统语音，功能不中断。切换音色改 `offscreen.js` 顶部 `VOICES`（如 `en-US-JennyNeural`）
 5. **Service Worker** — MV3 会在闲置 30 秒后终止 Worker。本扩展用 `chrome.alarms` 15 秒心跳保持活跃
 
 ---
@@ -236,7 +262,7 @@ zip -r en-context-notes.zip . -x "*.DS_Store" ".git/*"
 
 - **云同步**：Firebase Firestore，按用户 ID 存储记录。需登录系统
 - **手机 App**：从 Firebase 读取语料库，纯展示 + 搜索
-- **AI 语音朗读**：OpenAI TTS，缓存音频 blob 到 IndexedDB
+- ~~**AI 语音朗读**：OpenAI TTS~~ → ✅ v1.1 已实现（Edge 免费神经语音，见上文「TTS 语音链路」）
 - **导入/导出 Anki**：导出为 Anki 兼容格式
 - **词汇量估算**：基于遇见频率和间隔时间，估算已掌握的词汇量
 - **Firefox / Edge 移植**：代码基本兼容，manifest 稍作调整即可

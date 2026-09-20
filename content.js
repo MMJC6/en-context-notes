@@ -4,6 +4,7 @@ let hideTimer = null;
 let debounceTimer = null;
 let isSpeaking = false;
 let currentRecordId = null;
+let currentWord = '';
 const EXTENSION_RELOAD_MSG = '扩展刚刚更新，当前页面仍在使用旧脚本。请刷新页面后重试。';
 
 // ===== Chinese page detection =====
@@ -173,6 +174,7 @@ function createPopup() {
       <span>翻译中...</span>
     </div>
     <div class="en-trans-actions">
+      <button class="en-trans-btn speak-word" title="朗读单词">🔈</button>
       <button class="en-trans-btn speak" title="朗读原句">▶</button>
       <span class="en-trans-status"></span>
     </div>
@@ -186,10 +188,27 @@ function createPopup() {
     scheduleHide(800);
   });
 
-  // Speak button
+  // Speak button (whole sentence)
   popup.querySelector('.en-trans-btn.speak').addEventListener('click', (e) => {
     e.stopPropagation();
     toggleSpeak();
+  });
+
+  // Word pronunciation button — same neural TTS, plays just the selected word.
+  // Starting it mid-sentence interrupts the sentence (handled offscreen side).
+  popup.querySelector('.en-trans-btn.speak-word').addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (currentWord) {
+      sendRuntimeMessage({ action: 'speak', text: currentWord }).catch(() => {});
+    }
+  });
+
+  // Word-level pronunciation: click the highlighted word in the original sentence
+  popup.addEventListener('click', (e) => {
+    if (e.target.classList && e.target.classList.contains('en-trans-word-highlight')) {
+      e.stopPropagation();
+      sendRuntimeMessage({ action: 'speak', text: e.target.textContent.trim() }).catch(() => {});
+    }
   });
 
   document.body.appendChild(popup);
@@ -201,13 +220,14 @@ function showPopup(x, y, word, sentence) {
   // Reset state
   isSpeaking = false;
   currentRecordId = null;
+  currentWord = word || '';
 
   // Highlight word in sentence display
   const originalEl = popup.querySelector('.en-trans-original');
   const parts = sentence.split(new RegExp('(' + escapeRegex(word) + ')', 'gi'));
   originalEl.innerHTML = parts.map((part, i) => {
     if (part.toLowerCase() === word.toLowerCase()) {
-      return '<span class="en-trans-word-highlight">' + escapeHtml(part) + '</span>';
+      return '<span class="en-trans-word-highlight" title="点击朗读该单词">' + escapeHtml(part) + '</span>';
     }
     return escapeHtml(part);
   }).join('');

@@ -53,6 +53,7 @@
   padding: 1px 4px;
   border-radius: 3px;
   font-weight: 600;
+  cursor: pointer;
 }
 
 .en-trans-popup .en-trans-word-box {
@@ -119,7 +120,8 @@
   background: #585b70;
 }
 
-.en-trans-popup .en-trans-btn.speak {
+.en-trans-popup .en-trans-btn.speak,
+.en-trans-popup .en-trans-btn.speak-word {
   background: #313244;
   color: #89b4fa;
   padding: 5px 8px;
@@ -128,7 +130,8 @@
   text-align: center;
 }
 
-.en-trans-popup .en-trans-btn.speak:hover {
+.en-trans-popup .en-trans-btn.speak:hover,
+.en-trans-popup .en-trans-btn.speak-word:hover {
   background: #45475a;
 }
 

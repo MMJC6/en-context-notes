@@ -455,8 +455,57 @@ function parseTranslation(content) {
   throw new Error(`Failed to parse translation response${summary ? `: ${summary}` : ''}`);
 }
 
+// ===== TTS =====
+// Primary: Microsoft Edge online neural voices (free, keyless — the same service
+// the Edge browser's own read-aloud uses). English uses en-US-AriaNeural (US
+// female). Audio is fetched + played inside an offscreen document because MV3
+// service workers have no Audio element. Fallback: chrome.tts system voice.
+async function ensureOffscreenDocument() {
+  const contexts = await chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'] });
+  if (contexts && contexts.length > 0) return;
+  await chrome.offscreen.createDocument({
+    url: 'offscreen.html',
+    reasons: ['AUDIO_PLAYBACK'],
+    justification: 'Play neural text-to-speech audio for the read-aloud button'
+  });
+}
+
+async function stopSpeaking() {
+  try {
+    await ensureOffscreenDocument();
+    await chrome.runtime.sendMessage({ target: 'offscreen', cmd: 'stop' });
+  } catch (e) {
+    // Offscreen route unavailable — system voice stop still applies.
+  }
+  chrome.tts.stop();
+}
+
+function speakWithSystemTts(text) {
+  const hasChinese = /[一-鿿]/.test(text);
+  const lang = hasChinese ? 'zh-CN' : 'en-US';
+  new Promise(resolve => chrome.tts.getVoices(resolve)).then(voices => {
+    let voiceName;
+    if (hasChinese) {
+      const zh = voices.find(v => v.lang && v.lang.startsWith('zh'));
+      if (zh) voiceName = zh.voiceName;
+    } else {
+      for (const name of ['Samantha', 'Alex', 'Google US English', 'Microsoft Zira']) {
+        const found = voices.find(v => v.voiceName && v.voiceName.includes(name));
+        if (found) { voiceName = found.voiceName; break; }
+      }
+      if (!voiceName) {
+        const en = voices.find(v => v.lang && v.lang.startsWith('en'));
+        if (en) voiceName = en.voiceName;
+      }
+    }
+    chrome.tts.speak(text, { voiceName, lang, rate: 1.0, pitch: 1.0, volume: 1.0 });
+  });
+}
+
 // ===== Message handling =====
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  // Internal routing messages for the offscreen document — handled there, not here.
+  if (request && request.target === 'offscreen') return;
   handleMessage(request, sender).then(sendResponse).catch(err => sendResponse({ error: err.message }));
   return true; // async response
 });
@@ -572,25 +621,23 @@ async function handleMessage(request, sender) {
 
     case 'speak': {
       const { text } = request;
-      const hasChinese = /[一-鿿]/.test(text);
-      const lang = hasChinese ? 'zh-CN' : 'en-US';
-      const voices = await new Promise(resolve => chrome.tts.getVoices(resolve));
-      let voiceName;
-      if (hasChinese) {
-        const zh = voices.find(v => v.lang && v.lang.startsWith('zh'));
-        if (zh) voiceName = zh.voiceName;
-      } else {
-        for (const name of ['Samantha', 'Alex', 'Google US English', 'Microsoft Zira']) {
-          const found = voices.find(v => v.voiceName && v.voiceName.includes(name));
-          if (found) { voiceName = found.voiceName; break; }
-        }
-        if (!voiceName) {
-          const en = voices.find(v => v.lang && v.lang.startsWith('en'));
-          if (en) voiceName = en.voiceName;
-        }
+      if (!text) {
+        await stopSpeaking();
+        return { success: true, stopped: true };
       }
-      chrome.tts.speak(text, { voiceName, lang, rate: 1.0, pitch: 1.0, volume: 1.0 });
-      return { success: true };
+      try {
+        await ensureOffscreenDocument();
+        const resp = await chrome.runtime.sendMessage({ target: 'offscreen', cmd: 'speak', text });
+        if (resp && resp.error) throw new Error(resp.error);
+        return resp || { success: true };
+      } catch (e) {
+        // Edge voice unreachable (offline / endpoint changed) → system voice keeps the
+        // button functional. Record the reason so fallbacks are visible in debugging.
+        console.warn('[speak] Edge neural TTS failed, falling back to system voice:', e && e.message);
+        try { chrome.storage.session.set({ ttsFallback: { message: e && e.message, at: Date.now() } }); } catch (e2) { /* noop */ }
+        speakWithSystemTts(text);
+        return { success: true, fallback: 'system' };
+      }
     }
 
     case 'getSettings': {
