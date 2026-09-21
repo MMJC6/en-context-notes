@@ -57,9 +57,13 @@
 
 > 🚧 即将上架，敬请期待
 
-### 手动安装（开发者模式）
+### 方式一：直接下载安装包（推荐）
 
-**方式一：下载 ZIP（不会 git 也能装）**
+到 [Releases](https://github.com/MMJC6/en-context-notes/releases/latest) 下载最新的 `en-context-notes-vx.x.x.zip`，解压后按下方步骤加载。
+
+### 方式二 / 三：源码包或 git clone
+
+**下载源码 ZIP（不会 git 也能装）**
 
 1. 点击本页绿色 `Code` 按钮 → `Download ZIP`，解压到任意目录
 
