@@ -69,7 +69,7 @@ async function getSettings() {
   return {
     apiKey: data.apiKey || env.apiKey || '',
     apiBase: data.apiBase || env.apiBase || 'https://api.deepseek.com/v1',
-    apiModel: data.apiModel || env.apiModel || 'deepseek-chat'
+    apiModel: data.apiModel || env.apiModel || 'deepseek-flash'
   };
 }
 

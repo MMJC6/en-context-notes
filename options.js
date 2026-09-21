@@ -9,7 +9,7 @@ async function loadSettings() {
     if (!settings.error) {
       document.getElementById('apiKey').value = settings.apiKey || '';
       document.getElementById('apiBase').value = settings.apiBase || 'https://api.deepseek.com/v1';
-      document.getElementById('apiModel').value = settings.apiModel || 'deepseek-chat';
+      document.getElementById('apiModel').value = settings.apiModel || 'deepseek-flash';
     }
   } catch (e) {
     // Settings not loaded, use defaults
@@ -32,7 +32,7 @@ async function resetSettings() {
 async function saveSettings() {
   const apiKey = document.getElementById('apiKey').value.trim();
   const apiBase = document.getElementById('apiBase').value.trim() || 'https://api.deepseek.com/v1';
-  const apiModel = document.getElementById('apiModel').value.trim() || 'deepseek-chat';
+  const apiModel = document.getElementById('apiModel').value.trim() || 'deepseek-flash';
 
   if (!apiKey) {
     showStatus('请输入 API Key', 'error');

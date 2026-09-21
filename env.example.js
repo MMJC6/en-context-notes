@@ -4,5 +4,5 @@
 export const ENV = {
   apiKey: 'sk-xxxx',
   apiBase: 'https://api.deepseek.com/v1',
-  apiModel: 'deepseek-chat'
+  apiModel: 'deepseek-flash'
 };
