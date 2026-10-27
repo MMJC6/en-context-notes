@@ -5,7 +5,18 @@ let debounceTimer = null;
 let isSpeaking = false;
 let currentRecordId = null;
 let currentWord = '';
+let autoSpeakEnabled = true; // 划词自动朗读，默认开（设置页可关）
 const EXTENSION_RELOAD_MSG = '扩展刚刚更新，当前页面仍在使用旧脚本。请刷新页面后重试。';
+
+// 同步设置页的自动朗读开关；缓存成同步变量，避免每次弹窗异步读 storage 产生竞态
+chrome.storage.local.get({ autoSpeak: true }, ({ autoSpeak }) => {
+  autoSpeakEnabled = autoSpeak !== false;
+});
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && 'autoSpeak' in changes) {
+    autoSpeakEnabled = changes.autoSpeak.newValue !== false;
+  }
+});
 
 // ===== Chinese page detection =====
 function isChinesePage() {
@@ -259,6 +270,12 @@ function showPopup(x, y, word, sentence) {
 
   // Reset hide timer
   clearTimeout(hideTimer);
+
+  // Auto-pronounce the word immediately — don't wait for the translation
+  // round-trip, so audio starts while 翻译中 is still spinning.
+  if (autoSpeakEnabled && currentWord) {
+    sendRuntimeMessage({ action: 'speak', text: currentWord }).catch(() => {});
+  }
 
   // Trigger translation
   translateAndUpdate(word, sentence, document.title, location.href);

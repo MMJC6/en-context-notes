@@ -59,6 +59,29 @@ h1 {
   margin-top: 4px;
 }
 
+/* 复选框行：覆写 .form-group input 的 width:100% 等文本框样式 */
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 400;
+  color: #cdd6f4;
+  margin-bottom: 0;
+}
+
+.checkbox-row input[type="checkbox"] {
+  width: auto;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 0;
+  font-family: inherit;
+  accent-color: #89b4fa;
+  cursor: pointer;
+}
+
 .form-actions {
   display: flex;
   align-items: center;

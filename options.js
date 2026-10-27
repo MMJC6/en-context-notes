@@ -3,6 +3,22 @@ document.addEventListener('DOMContentLoaded', loadSettings);
 document.getElementById('saveBtn').addEventListener('click', saveSettings);
 document.getElementById('resetBtn').addEventListener('click', resetSettings);
 
+const autoSpeakEl = document.getElementById('autoSpeak');
+
+// 自动朗读开关即时生效，不占用「保存设置」（那个只管 API 配置）
+chrome.storage.local.get({ autoSpeak: true }).then(({ autoSpeak }) => {
+  autoSpeakEl.checked = autoSpeak !== false;
+});
+autoSpeakEl.addEventListener('change', async () => {
+  try {
+    await chrome.storage.local.set({ autoSpeak: autoSpeakEl.checked });
+    showStatus(autoSpeakEl.checked ? '✓ 已开启划词自动朗读' : '✓ 已关闭划词自动朗读', 'success');
+  } catch (e) {
+    showStatus('保存失败: ' + e.message, 'error');
+    autoSpeakEl.checked = !autoSpeakEl.checked;
+  }
+});
+
 async function loadSettings() {
   try {
     const settings = await chrome.runtime.sendMessage({ action: 'getSettings' });
